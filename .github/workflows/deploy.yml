@@ -1,0 +1,58 @@
+name: Deploy Prod to ECR
+
+on:
+  create:
+    tags:
+      - 'v*.*.*'
+      - '!v*.*.*-*'
+
+env:
+  AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
+  AWS_ROLE: ${{ secrets.PROD_AWS_ROLE }}
+  ECR_REPOSITORY: personal-docai-enterprise-prodcodepipeline-personaldocaienterpriseprodrepositorydd27859b-ipbalj4ywsd5
+  LOCAL_IMAGE_NAME: inference-server
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE }}
+          role-session-name: ECRLoginWithGithub
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build & Push
+        id: build-and-push-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          ECR_IMAGE_TAG: ${{ github.sha }}
+          LOCAL_IMAGE_NAME: ${{ env.LOCAL_IMAGE_NAME }}
+        working-directory: ./
+        run: |
+          COMMIT_HASH=$(echo $ECR_IMAGE_TAG | cut -c 1-7)
+          TAG_1=$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.ref_name }}
+          TAG_2=$ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_HASH
+          TAG_3=$ECR_REGISTRY/$ECR_REPOSITORY:saas-latest
+
+          docker build -t $LOCAL_IMAGE_NAME -f ./cdk/Dockerfile .
+          docker tag $LOCAL_IMAGE_NAME $TAG_1
+          docker tag $LOCAL_IMAGE_NAME $TAG_2
+          docker tag $LOCAL_IMAGE_NAME $TAG_3
+
+          docker push $TAG_1
+          docker push $TAG_2
+          docker push $TAG_3
