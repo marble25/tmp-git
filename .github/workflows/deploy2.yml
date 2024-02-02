@@ -2,11 +2,9 @@ name: Deploy Prod with Unofficial Version to ECR
 
 on:
   push:
-    branches:
-      - main
     tags:
-      - 'v*.*.*-*'
-      - '!v*.*.*-agent'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+      - '!v[0-9]+.[0-9]+.[0-9]+-agent'
 
 env:
   AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
