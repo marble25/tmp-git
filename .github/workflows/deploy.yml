@@ -1,7 +1,7 @@
 name: Deploy Prod to ECR
 
 on:
-  create:
+  push:
     tags:
       - 'v*.*.*'
       - '!v*.*.*-*'
