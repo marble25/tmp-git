@@ -2,6 +2,8 @@ name: Deploy Prod to ECR
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
       - '!v*.*.*-*'
