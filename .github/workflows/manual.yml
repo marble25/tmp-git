@@ -1,10 +1,10 @@
-name: Deploy Manually
+name: Build & Deploy to Prod
 
 on:
   workflow_dispatch:
     inputs:
-      deployAgent:
-        description: 'Deploy to Agent'
+      buildAgent:
+        description: 'Build & Push agent image to ECR'
         required: true
         default: false
         type: boolean
@@ -31,36 +31,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Configure aws credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: ${{ env.AWS_ROLE }}
-          role-session-name: ECRLoginWithGithub
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Build & Push
+      - name: Build & Push Controller Image
         id: build-and-push-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          DEPLOY_PROD: ${{ inputs.deployProd }}
           ECR_IMAGE_TAG: ${{ github.sha }}
           LOCAL_IMAGE_NAME: ${{ env.LOCAL_IMAGE_NAME }}
         working-directory: ./
         run: |
+          if [ $DEPLOY_PROD = true ]; then
+            echo "Deploying to Prod"
+          else
+            echo "Not deploying to Prod"
+          fi
           COMMIT_HASH=$(echo $ECR_IMAGE_TAG | cut -c 1-7)
           TAG_1=$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.ref_name }}
           TAG_2=$ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_HASH
-          TAG_3=$ECR_REGISTRY/$ECR_REPOSITORY:saas-latest
 
-          docker build -t $LOCAL_IMAGE_NAME -f ./cdk/Dockerfile .
+          docker build -t $LOCAL_IMAGE_NAME -f ./cdk/Dockerfile.controller .
           docker tag $LOCAL_IMAGE_NAME $TAG_1
           docker tag $LOCAL_IMAGE_NAME $TAG_2
-          docker tag $LOCAL_IMAGE_NAME $TAG_3
+          
 
           docker push $TAG_1
           docker push $TAG_2
-          docker push $TAG_3
+
+          if [ $DEPLOY_PROD = true ]; then
+            TAG_3=$ECR_REGISTRY/$ECR_REPOSITORY:saas-latest
+            docker tag $LOCAL_IMAGE_NAME $TAG_3
+            docker push $TAG_3
+          fi
