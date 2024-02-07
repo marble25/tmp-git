@@ -1,10 +1,9 @@
 name: Deploy Prod to ECR
 
 on:
-  create:
+  push:
     tags:
-      - 'v*.*.*'
-      - '!v*.*.*-*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 env:
   AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
