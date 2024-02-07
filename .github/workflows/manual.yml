@@ -41,6 +41,7 @@ jobs:
           LOCAL_IMAGE_NAME: ${{ env.LOCAL_IMAGE_NAME }}
         working-directory: ./
         run: |
+          echo $DEPLOY_PROD
           if [ $DEPLOY_PROD = true ]; then
             echo "Deploying to Prod"
           else
