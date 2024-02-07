@@ -18,7 +18,6 @@ env:
   AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
   AWS_ROLE: ${{ secrets.PROD_AWS_ROLE }}
   ECR_REPOSITORY: personal-docai-enterprise-prodcodepipeline-personaldocaienterpriseprodrepositorydd27859b-ipbalj4ywsd5
-  LOCAL_IMAGE_NAME: inference-server
 
 permissions:
   id-token: write
@@ -31,6 +30,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Build & Push Docker Agent Image
+        id: build-and-push-docker-agent-image
+        if: ${{ inputs.buildAgent }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          ECR_IMAGE_TAG: ${{ github.sha }}
+        working-directory: ./
+        run: |
+          COMMIT_HASH=$(echo $ECR_IMAGE_TAG | cut -c 1-7)
+          LOCAL_IMAGE_NAME=inference-docker-agent
+          TAG_1=$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.ref_name }}-agent-docker
+
+          docker build -t $LOCAL_IMAGE_NAME -f ./cdk/Dockerfile.agent.docker .
+          docker tag $LOCAL_IMAGE_NAME $TAG_1
+          
+          docker push $TAG_1
+
+      - name: Build & Push Podman Agent Image
+        id: build-and-push-podman-agent-image
+        if: ${{ inputs.buildAgent }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          ECR_IMAGE_TAG: ${{ github.sha }}
+        working-directory: ./
+        run: |
+          COMMIT_HASH=$(echo $ECR_IMAGE_TAG | cut -c 1-7)
+          LOCAL_IMAGE_NAME=inference-podman-agent
+          TAG_1=$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.ref_name }}-agent-podman
+
+          docker build -t $LOCAL_IMAGE_NAME -f ./cdk/Dockerfile.agent.podman .
+          docker tag $LOCAL_IMAGE_NAME $TAG_1
+          
+          docker push $TAG_1
+
       - name: Build & Push Controller Image
         id: build-and-push-image
         env:
@@ -41,13 +76,8 @@ jobs:
           LOCAL_IMAGE_NAME: ${{ env.LOCAL_IMAGE_NAME }}
         working-directory: ./
         run: |
-          echo $DEPLOY_PROD
-          if [ $DEPLOY_PROD = true ]; then
-            echo "Deploying to Prod"
-          else
-            echo "Not deploying to Prod"
-          fi
           COMMIT_HASH=$(echo $ECR_IMAGE_TAG | cut -c 1-7)
+          LOCAL_IMAGE_NAME=inference-server
           TAG_1=$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.ref_name }}
           TAG_2=$ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_HASH
 
@@ -60,6 +90,7 @@ jobs:
           docker push $TAG_2
 
           if [ $DEPLOY_PROD = true ]; then
+            echo "Deploying to Prod"
             TAG_3=$ECR_REGISTRY/$ECR_REPOSITORY:saas-latest
             docker tag $LOCAL_IMAGE_NAME $TAG_3
             docker push $TAG_3
